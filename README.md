@@ -1,6 +1,6 @@
 # React Crypto ATM
 
-This is a simple React component for a Crypto ATM application. It allows users to connect their MetaMask wallet, view their account balance, deposit and withdraw ETH.
+This is a simple React component for a Crypto ATM application. It allows users to connect their MetaMask wallet, deposit or withdraw ETH and can change  their account address using openWallet.
 
 ## Features
 
@@ -11,6 +11,7 @@ The Crypto ATM component provides the following features:
 - View user's account balance
 - Deposit ETH into the ATM
 - Withdraw ETH from the ATM
+- change own account using openWallet
 
 Please note that the component assumes you have set up and configured MetaMask in your browser.
 
