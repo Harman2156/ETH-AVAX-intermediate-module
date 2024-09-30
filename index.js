@@ -6,9 +6,11 @@ export default function HomePage() {
     const [ethWallet, setEthWallet] = useState(undefined);
     const [account, setAccount] = useState(undefined);
     const [atm, setATM] = useState(undefined);
-    const [userBalance, setUserBalance] = useState(1); // Start from 1 ETH
+    const [userBalance, setUserBalance] = useState(0);
     const [depositAmount, setDepositAmount] = useState("");
     const [withdrawAmount, setWithdrawAmount] = useState("");
+    const [transferAmount, setTransferAmount] = useState(""); // State for transfer amount
+    const [recipientAddress, setRecipientAddress] = useState(""); // State for recipient address
     const [verificationInput, setVerificationInput] = useState('');
     const [isVerified, setIsVerified] = useState(false);
     const [verificationError, setVerificationError] = useState('');
@@ -19,6 +21,8 @@ export default function HomePage() {
     const getWallet = async () => {
         if (window.ethereum) {
             setEthWallet(window.ethereum);
+        } else {
+            alert("Please install MetaMask to use this ATM.");
         }
     };
 
@@ -50,6 +54,18 @@ export default function HomePage() {
 
         const accounts = await ethWallet.request({ method: "eth_requestAccounts" });
         handleAccount(accounts);
+        await openWallet(); 
+    };
+
+    const openWallet = async () => {
+        if (atm) {
+            try {
+                await atm.openWallet(); // Call the openWallet function in the contract
+                console.log("Wallet opened successfully.");
+            } catch (error) {
+                console.error("Error opening wallet: ", error);
+            }
+        }
     };
 
     const getATMContract = () => {
@@ -69,7 +85,8 @@ export default function HomePage() {
         if (ethWallet && account) {
             try {
                 const provider = new ethers.providers.Web3Provider(ethWallet);
-                setUserBalance(1); // Set to 1 ETH on connection
+                const balance = await provider.getBalance(account);
+                setUserBalance(ethers.utils.formatEther(balance)); // Set user balance to actual ETH balance
             } catch (error) {
                 console.error("Error fetching balance: ", error);
             }
@@ -78,7 +95,7 @@ export default function HomePage() {
 
     const deposit = async () => {
         if (atm) {
-            const depositValue = parseInt(depositAmount);
+            const depositValue = parseFloat(depositAmount);
             if (depositValue < 1) {
                 alert("Please enter a value greater than 0 ETH.");
                 return;
@@ -86,14 +103,11 @@ export default function HomePage() {
 
             try {
                 let tx = await atm.deposit({
-                    value: ethers.utils.parseUnits(depositValue.toString(), 'ether') // Use 'ether'
+                    value: ethers.utils.parseUnits(depositValue.toString(), 'ether')
                 });
                 await tx.wait();
                 setDepositAmount(""); // Clear the deposit input
-
-                // Increment user balance after deposit
-                setUserBalance(prevBalance => prevBalance + depositValue);
-                
+                setUserBalance(prevBalance => prevBalance + depositValue); // Update user balance
             } catch (error) {
                 console.error("Error during deposit: ", error);
             }
@@ -102,22 +116,40 @@ export default function HomePage() {
 
     const withdraw = async () => {
         if (atm && withdrawAmount) {
-            const withdrawValue = parseInt(withdrawAmount);
+            const withdrawValue = parseFloat(withdrawAmount);
             if (withdrawValue > userBalance) {
                 alert("Insufficient balance for withdrawal.");
                 return;
             }
 
             try {
-                let tx = await atm.withdraw(ethers.utils.parseUnits(withdrawValue.toString(), 'ether')); // Use 'ether'
+                let tx = await atm.withdraw(ethers.utils.parseUnits(withdrawValue.toString(), 'ether'));
                 await tx.wait();
                 setWithdrawAmount(""); // Clear the withdraw input
-
-                // Decrement user balance after withdrawal
-                setUserBalance(prevBalance => prevBalance - withdrawValue);
-                
+                setUserBalance(prevBalance => prevBalance - withdrawValue); // Update user balance
             } catch (error) {
                 console.error("Error during withdraw: ", error);
+            }
+        }
+    };
+
+    // New transfer function
+    const transfer = async () => {
+        if (atm && transferAmount && recipientAddress) {
+            const transferValue = parseFloat(transferAmount);
+            if (transferValue > userBalance) {
+                alert("Insufficient balance for transfer.");
+                return;
+            }
+
+            try {
+                let tx = await atm.transfer(recipientAddress, ethers.utils.parseUnits(transferValue.toString(), 'ether'));
+                await tx.wait();
+                setTransferAmount(""); // Clear the transfer input
+                setRecipientAddress(""); // Clear recipient input
+                setUserBalance(prevBalance => prevBalance - transferValue); // Update user balance
+            } catch (error) {
+                console.error("Error during transfer: ", error);
             }
         }
     };
@@ -138,13 +170,12 @@ export default function HomePage() {
         }
 
         if (!account) {
-            return <button onClick={connectAccount}>Open Wallet</button>;
+            return <button onClick={connectAccount}>Connect Wallet</button>;
         }
 
         return (
             <div>
                 <p>Your Account: {account}</p>
-                <p>Receiver Address: {contractAddress}</p>
                 <p>Your Balance: {userBalance} ETH</p>
 
                 {!isVerified ? (
@@ -185,6 +216,23 @@ export default function HomePage() {
                                 min="1"
                             />
                             <button onClick={withdraw}>Withdraw ETH</button>
+                        </div>
+
+                        <div>
+                            <input
+                                type="text"
+                                value={recipientAddress}
+                                onChange={(e) => setRecipientAddress(e.target.value)}
+                                placeholder="Recipient Address"
+                            />
+                            <input
+                                type="number"
+                                value={transferAmount}
+                                onChange={(e) => setTransferAmount(e.target.value)}
+                                placeholder="Amount to Transfer (ETH)"
+                                min="1"
+                            />
+                            <button onClick={transfer}>Transfer ETH</button>
                         </div>
                     </>
                 )}
@@ -257,15 +305,7 @@ export default function HomePage() {
                     background-color: rgba(255, 255, 255, 0.2);
                     padding: 30px;
                     border-radius: 12px;
-                    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-                    margin-bottom: 20px;
-                    width: 400px;
-                }
-
-                .balance-container p {
-                    font-size: 1.5rem;
-                    font-weight: bold;
-                    margin: 0;
+                    box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.3);
                 }
             `}</style>
         </main>
