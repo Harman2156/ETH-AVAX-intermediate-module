@@ -1,72 +1,96 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: UNLICENSED 
 pragma solidity ^0.8.9;
 
 contract Assessment {
     address payable public owner;
+    bool public paused = false;
 
-    // Event emitted for deposit and withdraw actions
+    // Events
     event Deposit(address indexed from, uint256 amount);
     event Withdraw(address indexed to, uint256 amount);
+    event WalletOpened(address indexed user);
+    event Transfer(address indexed from, address indexed to, uint256 amount); // Event for transfer
 
-    // Custom error for insufficient balance
+    // Custom error
     error InsufficientBalance(uint256 available, uint256 requested);
 
-    // Mapping to keep track of user balances
+    // Mappings
     mapping(address => uint256) public balances;
+    mapping(address => bool) public hasOpenedWallet;
 
+    // Constructor
     constructor() {
-        owner = payable(msg.sender);  // Set the contract deployer as the owner
+        owner = payable(msg.sender);
     }
 
-    // Function to get the current contract balance
-    function getContractBalance() public view returns (uint256) {
-        return address(this).balance;  // Return the actual balance of the contract
+    modifier whenNotPaused() {
+        require(!paused, "Contract is paused");
+        _;
     }
 
-    // Function to get the balance of a specific user
-    function getUserBalance(address user) public view returns (uint256) {
-        return balances[user];  // Return the user's balance
+    // Function to open the wallet
+    function openWallet() public whenNotPaused {
+        require(!hasOpenedWallet[msg.sender], "Wallet already opened");
+        hasOpenedWallet[msg.sender] = true;
+
+        emit WalletOpened(msg.sender);
     }
 
-    // Deposit function, allowing deposits between 1 and 10 ETH
-    function deposit() public payable {
-        // The deposit amount should be between 1 and 10 ETH
+    // Deposit function
+    function deposit() public payable whenNotPaused {
         require(msg.value >= 1 ether && msg.value <= 10 ether, "Deposit must be between 1 and 10 ETH");
-
-        // Update user balance
         balances[msg.sender] += msg.value;
-
-        // Emit a deposit event for logging
         emit Deposit(msg.sender, msg.value);
     }
 
-    // Withdraw function to allow the owner to withdraw funds
+    // Withdraw function for the owner
     function withdraw(uint256 _withdrawAmount) public {
-        // Ensure that only the owner can withdraw
         require(msg.sender == owner, "You are not the owner of this account");
-
-        // Check if there are enough funds to withdraw
         if (address(this).balance < _withdrawAmount) {
             revert InsufficientBalance({
                 available: address(this).balance,
                 requested: _withdrawAmount
             });
         }
-
-        // Transfer the requested amount to the owner
         owner.transfer(_withdrawAmount);
-
-        // Emit a withdraw event for logging
         emit Withdraw(owner, _withdrawAmount);
     }
 
-    // Fallback function to accept direct ETH deposits
-    receive() external payable {
-        // Update balance for the sender
-        balances[msg.sender] += msg.value;
+    // Emergency withdraw for users
+    function emergencyWithdraw(uint256 _amount) public whenNotPaused {
+        require(balances[msg.sender] >= _amount, "Insufficient balance for withdrawal");
+        balances[msg.sender] -= _amount;
+        payable(msg.sender).transfer(_amount);
+        emit Withdraw(msg.sender, _amount);
+    }
 
-        // Emit a deposit event when ETH is sent directly to the contract
+    // Transfer functionality
+    function transfer(address payable _to, uint256 _amount) public whenNotPaused {
+        require(balances[msg.sender] >= _amount, "Insufficient balance for transfer");
+        require(_to != address(0), "Invalid recipient address");
+        
+        // Update balances
+        balances[msg.sender] -= _amount; // Deduct from sender's balance
+        balances[_to] += _amount; // Add to recipient's balance
+
+        // Emit transfer event
+        emit Transfer(msg.sender, _to, _amount);
+    }
+
+    // Fallback function
+    receive() external payable {
+        balances[msg.sender] += msg.value;
         emit Deposit(msg.sender, msg.value);
+    }
+    
+    function pauseContract() public {
+        require(msg.sender == owner, "Only the owner can pause the contract");
+        paused = true;
+    }
+
+    function unpauseContract() public {
+        require(msg.sender == owner, "Only the owner can unpause the contract");
+        paused = false;
     }
 }
 
