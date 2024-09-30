@@ -13,7 +13,8 @@ The Crypto ATM component provides the following features:
 - Withdraw ETH from the ATM
 - Verify user to prevent automated actions
 - user can give the amount of deposit and withdraw
-- input and withdraw buttons  have specific range 
+- input and withdraw buttons  have specific range
+- we can transfer eth to specific account
 
 Please note that the component assumes you have set up and configured MetaMask in your browser.
 
